@@ -1,7 +1,8 @@
-import { useEffect, useRef } from "react";
+import { useEffect, useRef, useState, useMemo } from "react";
 import ReactMarkdown from "react-markdown";
 import rehypeHighlight from "rehype-highlight";
 import remarkGfm from "remark-gfm";
+import { useDebounce } from "../hooks/useDebounce";
 import { Conversation, Message } from "../lib/types";
 
 interface MessageThreadProps {
@@ -10,8 +11,30 @@ interface MessageThreadProps {
   loading: boolean;
 }
 
-function MessageBubble({ message }: { message: Message }) {
+/**
+ * Highlights all occurrences of `query` in `text` by wrapping matches
+ * in a <mark> tag. Returns an array of React nodes.
+ */
+function highlightText(text: string, query: string): React.ReactNode[] {
+  if (!query) return [text];
+
+  const regex = new RegExp(`(${query.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")})`, "gi");
+  const parts = text.split(regex);
+
+  return parts.map((part, i) =>
+    regex.test(part) ? (
+      <mark key={i} className="bg-yellow-500/30 text-yellow-200 rounded px-0.5">
+        {part}
+      </mark>
+    ) : (
+      part
+    )
+  );
+}
+
+function MessageBubble({ message, searchQuery }: { message: Message; searchQuery: string }) {
   const isUser = message.role === "user";
+  const isMatch = searchQuery && message.content.toLowerCase().includes(searchQuery.toLowerCase());
 
   return (
     <div className={`flex ${isUser ? "justify-end" : "justify-start"}`}>
@@ -20,14 +43,14 @@ function MessageBubble({ message }: { message: Message }) {
           isUser
             ? "bg-zinc-700 text-zinc-100"
             : "bg-zinc-900 text-zinc-200 border border-zinc-800"
-        }`}
+        } ${isMatch ? "ring-2 ring-yellow-500/60" : ""}`}
       >
         <p className={`text-[11px] font-medium mb-1.5 ${isUser ? "text-zinc-400" : "text-emerald-500"}`}>
           {isUser ? "You" : "Assistant"}
         </p>
         {isUser ? (
           <div className="text-sm whitespace-pre-wrap break-words">
-            {message.content}
+            {searchQuery ? highlightText(message.content, searchQuery) : message.content}
           </div>
         ) : (
           <div className="text-sm prose prose-invert prose-sm max-w-none prose-pre:bg-zinc-950 prose-pre:border prose-pre:border-zinc-700 prose-code:text-emerald-400 prose-headings:text-zinc-100 prose-p:text-zinc-200 prose-a:text-blue-400 prose-strong:text-zinc-100 prose-li:text-zinc-200 prose-table:border-collapse prose-th:border prose-th:border-zinc-700 prose-th:px-3 prose-th:py-1.5 prose-th:bg-zinc-800 prose-td:border prose-td:border-zinc-700 prose-td:px-3 prose-td:py-1.5">
@@ -66,11 +89,48 @@ export default function MessageThread({
   loading,
 }: MessageThreadProps) {
   const scrollRef = useRef<HTMLDivElement>(null);
+  const [searchQuery, setSearchQuery] = useState("");
+  const debouncedQuery = useDebounce(searchQuery, 200);
+  const [currentMatchIndex, setCurrentMatchIndex] = useState(0);
 
-  // Scroll to top when conversation changes
+  // Reset search when conversation changes
   useEffect(() => {
+    setSearchQuery("");
+    setCurrentMatchIndex(0);
     scrollRef.current?.scrollTo(0, 0);
   }, [conversation?.id]);
+
+  // Find matching message indices
+  const matchIndices = useMemo(() => {
+    if (!debouncedQuery) return [];
+    const q = debouncedQuery.toLowerCase();
+    return messages
+      .map((m, i) => (m.content.toLowerCase().includes(q) ? i : -1))
+      .filter((i) => i !== -1);
+  }, [messages, debouncedQuery]);
+
+  // Scroll to current match
+  useEffect(() => {
+    if (matchIndices.length === 0) return;
+    const idx = matchIndices[currentMatchIndex];
+    const el = document.getElementById(`message-${idx}`);
+    el?.scrollIntoView({ behavior: "smooth", block: "center" });
+  }, [currentMatchIndex, matchIndices]);
+
+  // Reset match index when query changes
+  useEffect(() => {
+    setCurrentMatchIndex(0);
+  }, [debouncedQuery]);
+
+  function goToNextMatch() {
+    if (matchIndices.length === 0) return;
+    setCurrentMatchIndex((prev) => (prev + 1) % matchIndices.length);
+  }
+
+  function goToPrevMatch() {
+    if (matchIndices.length === 0) return;
+    setCurrentMatchIndex((prev) => (prev - 1 + matchIndices.length) % matchIndices.length);
+  }
 
   if (!conversation) {
     return (
@@ -87,12 +147,77 @@ export default function MessageThread({
     <div className="flex-1 flex flex-col min-w-0">
       {/* Header */}
       <div className="border-b border-zinc-800 px-6 py-3 shrink-0">
-        <h2 className="text-sm font-medium text-zinc-200 truncate">
-          {conversation.preview}
-        </h2>
-        <p className="text-xs text-zinc-500 mt-0.5">
-          {conversation.project.split("/").pop()} · {conversation.message_count} messages
-        </p>
+        <div className="flex items-center justify-between gap-4">
+          <div className="min-w-0">
+            <h2 className="text-sm font-medium text-zinc-200 truncate">
+              {conversation.preview}
+            </h2>
+            <p className="text-xs text-zinc-500 mt-0.5">
+              {conversation.project.split("/").pop()} · {conversation.message_count} messages
+            </p>
+          </div>
+
+          {/* In-conversation search */}
+          <div className="flex items-center gap-2 shrink-0">
+            <div className="relative">
+              <svg
+                className="absolute left-2 top-2 h-3.5 w-3.5 text-zinc-500"
+                fill="none"
+                stroke="currentColor"
+                viewBox="0 0 24 24"
+              >
+                <path
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                  strokeWidth={2}
+                  d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"
+                />
+              </svg>
+              <input
+                type="text"
+                placeholder="Find in conversation..."
+                value={searchQuery}
+                onChange={(e) => setSearchQuery(e.target.value)}
+                onKeyDown={(e) => {
+                  if (e.key === "Enter") {
+                    e.shiftKey ? goToPrevMatch() : goToNextMatch();
+                  }
+                  if (e.key === "Escape") {
+                    setSearchQuery("");
+                  }
+                }}
+                className="w-48 pl-7 pr-2 py-1.5 bg-zinc-900 border border-zinc-700 rounded-md text-xs text-zinc-100 placeholder-zinc-500 focus:outline-none focus:border-zinc-500"
+              />
+            </div>
+            {debouncedQuery && (
+              <div className="flex items-center gap-1">
+                <span className="text-[11px] text-zinc-500 whitespace-nowrap">
+                  {matchIndices.length === 0
+                    ? "No matches"
+                    : `${currentMatchIndex + 1}/${matchIndices.length}`}
+                </span>
+                <button
+                  onClick={goToPrevMatch}
+                  disabled={matchIndices.length === 0}
+                  className="p-1 text-zinc-400 hover:text-zinc-200 disabled:text-zinc-700"
+                >
+                  <svg className="h-3 w-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 15l7-7 7 7" />
+                  </svg>
+                </button>
+                <button
+                  onClick={goToNextMatch}
+                  disabled={matchIndices.length === 0}
+                  className="p-1 text-zinc-400 hover:text-zinc-200 disabled:text-zinc-700"
+                >
+                  <svg className="h-3 w-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
+                  </svg>
+                </button>
+              </div>
+            )}
+          </div>
+        </div>
       </div>
 
       {/* Messages */}
@@ -106,7 +231,9 @@ export default function MessageThread({
         ) : (
           <div className="flex flex-col gap-4">
             {messages.map((m, i) => (
-              <MessageBubble key={m.id || i} message={m} />
+              <div key={m.id || i} id={`message-${i}`}>
+                <MessageBubble message={m} searchQuery={debouncedQuery} />
+              </div>
             ))}
           </div>
         )}
