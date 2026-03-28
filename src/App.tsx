@@ -1,50 +1,101 @@
-import { useState } from "react";
-import reactLogo from "./assets/react.svg";
+import { useEffect, useState } from "react";
 import { invoke } from "@tauri-apps/api/core";
-import "./App.css";
+import { Conversation, Message } from "./lib/types";
+import Sidebar from "./components/Sidebar";
+import ConversationList from "./components/ConversationList";
+import MessageThread from "./components/MessageThread";
 
 function App() {
-  const [greetMsg, setGreetMsg] = useState("");
-  const [name, setName] = useState("");
+  const [conversations, setConversations] = useState<Conversation[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [selectedId, setSelectedId] = useState<string | null>(null);
+  const [selectedSource, setSelectedSource] = useState<string | null>(null);
+  const [messages, setMessages] = useState<Message[]>([]);
+  const [messagesLoading, setMessagesLoading] = useState(false);
 
-  async function greet() {
-    // Learn more about Tauri commands at https://tauri.app/develop/calling-rust/
-    setGreetMsg(await invoke("greet", { name }));
-  }
+  // Filter state
+  const [searchQuery, setSearchQuery] = useState("");
+  const [sourceFilter, setSourceFilter] = useState<"all" | "claude-code" | "cursor">("all");
+
+  // Load all conversations on startup
+  useEffect(() => {
+    invoke<Conversation[]>("list_conversations")
+      .then((data) => {
+        setConversations(data);
+        setLoading(false);
+      })
+      .catch((err) => {
+        console.error("Failed to load conversations:", err);
+        setLoading(false);
+      });
+  }, []);
+
+  // Load messages when a conversation is selected
+  useEffect(() => {
+    if (!selectedId || !selectedSource) {
+      setMessages([]);
+      return;
+    }
+    setMessagesLoading(true);
+    invoke<Message[]>("get_messages", { id: selectedId, source: selectedSource })
+      .then((data) => {
+        setMessages(data);
+        setMessagesLoading(false);
+      })
+      .catch((err) => {
+        console.error("Failed to load messages:", err);
+        setMessagesLoading(false);
+      });
+  }, [selectedId, selectedSource]);
+
+  // Filter conversations
+  const filtered = conversations.filter((c) => {
+    if (sourceFilter !== "all" && c.source !== sourceFilter) return false;
+    if (searchQuery) {
+      const q = searchQuery.toLowerCase();
+      return (
+        c.title.toLowerCase().includes(q) ||
+        c.preview.toLowerCase().includes(q) ||
+        c.project.toLowerCase().includes(q)
+      );
+    }
+    return true;
+  });
+
+  const selectedConversation = conversations.find(
+    (c) => c.id === selectedId && c.source === selectedSource
+  );
 
   return (
-    <main className="container">
-      <h1>Welcome to Tauri + React</h1>
+    <div className="flex h-screen">
+      {/* Left sidebar: search + filters */}
+      <Sidebar
+        searchQuery={searchQuery}
+        onSearchChange={setSearchQuery}
+        sourceFilter={sourceFilter}
+        onSourceFilterChange={setSourceFilter}
+        totalCount={conversations.length}
+        filteredCount={filtered.length}
+      />
 
-      <div className="row">
-        <a href="https://vite.dev" target="_blank">
-          <img src="/vite.svg" className="logo vite" alt="Vite logo" />
-        </a>
-        <a href="https://tauri.app" target="_blank">
-          <img src="/tauri.svg" className="logo tauri" alt="Tauri logo" />
-        </a>
-        <a href="https://react.dev" target="_blank">
-          <img src={reactLogo} className="logo react" alt="React logo" />
-        </a>
-      </div>
-      <p>Click on the Tauri, Vite, and React logos to learn more.</p>
-
-      <form
-        className="row"
-        onSubmit={(e) => {
-          e.preventDefault();
-          greet();
+      {/* Middle panel: conversation list */}
+      <ConversationList
+        conversations={filtered}
+        loading={loading}
+        selectedId={selectedId}
+        onSelect={(id, source) => {
+          setSelectedId(id);
+          setSelectedSource(source);
         }}
-      >
-        <input
-          id="greet-input"
-          onChange={(e) => setName(e.currentTarget.value)}
-          placeholder="Enter a name..."
-        />
-        <button type="submit">Greet</button>
-      </form>
-      <p>{greetMsg}</p>
-    </main>
+      />
+
+      {/* Right panel: message thread */}
+      <MessageThread
+        conversation={selectedConversation ?? null}
+        messages={messages}
+        loading={messagesLoading}
+      />
+    </div>
   );
 }
 
