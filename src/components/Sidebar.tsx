@@ -33,17 +33,7 @@ export default function Sidebar({
 }: SidebarProps) {
   const searchRef = useRef<HTMLInputElement>(null);
 
-  // Cmd+F focuses the search bar
-  useEffect(() => {
-    function handleKeyDown(e: KeyboardEvent) {
-      if (e.metaKey && e.key === "f") {
-        e.preventDefault();
-        searchRef.current?.focus();
-      }
-    }
-    window.addEventListener("keydown", handleKeyDown);
-    return () => window.removeEventListener("keydown", handleKeyDown);
-  }, []);
+  // Remove Cmd+F from sidebar — it's used for in-conversation search instead
 
   return (
     <aside className="w-64 border-r border-zinc-800 flex flex-col p-4 gap-4 shrink-0">
@@ -67,9 +57,15 @@ export default function Sidebar({
         <input
           ref={searchRef}
           type="text"
-          placeholder="Search... (⌘F)"
+          placeholder="Search..."
           value={searchQuery}
           onChange={(e) => onSearchChange(e.target.value)}
+          onKeyDown={(e) => {
+            if (e.key === "Escape") {
+              onSearchChange("");
+              searchRef.current?.blur();
+            }
+          }}
           className="w-full pl-9 pr-3 py-2 bg-zinc-900 border border-zinc-700 rounded-lg text-sm text-zinc-100 placeholder-zinc-500 focus:outline-none focus:border-zinc-500"
         />
       </div>

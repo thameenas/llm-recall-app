@@ -1,3 +1,4 @@
+import { useEffect, useRef } from "react";
 import { Conversation } from "../lib/types";
 
 interface ConversationListProps {
@@ -56,6 +57,42 @@ export default function ConversationList({
   selectedId,
   onSelect,
 }: ConversationListProps) {
+  const listRef = useRef<HTMLDivElement>(null);
+
+  // Keyboard navigation: Up/Down to move, Enter to select
+  useEffect(() => {
+    function handleKeyDown(e: KeyboardEvent) {
+      // Don't capture if user is typing in an input
+      const tag = (e.target as HTMLElement).tagName;
+      if (tag === "INPUT" || tag === "TEXTAREA") return;
+
+      if (e.key === "ArrowDown" || e.key === "ArrowUp") {
+        e.preventDefault();
+        const currentIndex = conversations.findIndex(
+          (c) => c.id === selectedId
+        );
+
+        let nextIndex: number;
+        if (e.key === "ArrowDown") {
+          nextIndex = currentIndex < conversations.length - 1 ? currentIndex + 1 : 0;
+        } else {
+          nextIndex = currentIndex > 0 ? currentIndex - 1 : conversations.length - 1;
+        }
+
+        const next = conversations[nextIndex];
+        if (next) {
+          onSelect(next.id, next.source);
+          // Scroll the selected item into view
+          const el = document.getElementById(`conv-${next.source}-${next.id}`);
+          el?.scrollIntoView({ block: "nearest" });
+        }
+      }
+    }
+
+    window.addEventListener("keydown", handleKeyDown);
+    return () => window.removeEventListener("keydown", handleKeyDown);
+  }, [conversations, selectedId, onSelect]);
+
   if (loading) {
     return (
       <div className="w-[360px] border-r border-zinc-800 shrink-0 overflow-y-auto">
@@ -65,7 +102,7 @@ export default function ConversationList({
   }
 
   return (
-    <div className="w-[360px] border-r border-zinc-800 shrink-0 overflow-y-auto">
+    <div ref={listRef} className="w-[360px] border-r border-zinc-800 shrink-0 overflow-y-auto">
       {conversations.length === 0 ? (
         <div className="p-6 text-center text-zinc-500 text-sm">
           No conversations found
@@ -75,6 +112,7 @@ export default function ConversationList({
           {conversations.map((c) => (
             <button
               key={`${c.source}-${c.id}`}
+              id={`conv-${c.source}-${c.id}`}
               onClick={() => onSelect(c.id, c.source)}
               className={`text-left p-3 border-b border-zinc-800/50 transition-colors ${
                 selectedId === c.id

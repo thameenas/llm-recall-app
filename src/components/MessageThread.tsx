@@ -89,6 +89,7 @@ export default function MessageThread({
   loading,
 }: MessageThreadProps) {
   const scrollRef = useRef<HTMLDivElement>(null);
+  const searchInputRef = useRef<HTMLInputElement>(null);
   const [searchQuery, setSearchQuery] = useState("");
   const debouncedQuery = useDebounce(searchQuery, 200);
   const [currentMatchIndex, setCurrentMatchIndex] = useState(0);
@@ -99,6 +100,18 @@ export default function MessageThread({
     setCurrentMatchIndex(0);
     scrollRef.current?.scrollTo(0, 0);
   }, [conversation?.id]);
+
+  // Cmd+F focuses the in-conversation search
+  useEffect(() => {
+    function handleKeyDown(e: KeyboardEvent) {
+      if (e.metaKey && e.key === "f") {
+        e.preventDefault();
+        searchInputRef.current?.focus();
+      }
+    }
+    window.addEventListener("keydown", handleKeyDown);
+    return () => window.removeEventListener("keydown", handleKeyDown);
+  }, []);
 
   // Find matching message indices
   const matchIndices = useMemo(() => {
@@ -174,8 +187,9 @@ export default function MessageThread({
                 />
               </svg>
               <input
+                ref={searchInputRef}
                 type="text"
-                placeholder="Find in conversation..."
+                placeholder="Find in conversation... (⌘F)"
                 value={searchQuery}
                 onChange={(e) => setSearchQuery(e.target.value)}
                 onKeyDown={(e) => {
