@@ -1,3 +1,7 @@
+import { useEffect, useRef } from "react";
+import ReactMarkdown from "react-markdown";
+import rehypeHighlight from "rehype-highlight";
+import remarkGfm from "remark-gfm";
 import { Conversation, Message } from "../lib/types";
 
 interface MessageThreadProps {
@@ -15,15 +19,23 @@ function MessageBubble({ message }: { message: Message }) {
         className={`max-w-[80%] rounded-lg px-4 py-3 ${
           isUser
             ? "bg-zinc-700 text-zinc-100"
-            : "bg-zinc-900 text-zinc-200"
+            : "bg-zinc-900 text-zinc-200 border border-zinc-800"
         }`}
       >
-        <p className="text-xs text-zinc-500 mb-1">
+        <p className={`text-[11px] font-medium mb-1.5 ${isUser ? "text-zinc-400" : "text-emerald-500"}`}>
           {isUser ? "You" : "Assistant"}
         </p>
-        <div className="text-sm whitespace-pre-wrap break-words">
-          {message.content}
-        </div>
+        {isUser ? (
+          <div className="text-sm whitespace-pre-wrap break-words">
+            {message.content}
+          </div>
+        ) : (
+          <div className="text-sm prose prose-invert prose-sm max-w-none prose-pre:bg-zinc-950 prose-pre:border prose-pre:border-zinc-700 prose-code:text-emerald-400 prose-headings:text-zinc-100 prose-p:text-zinc-200 prose-a:text-blue-400 prose-strong:text-zinc-100 prose-li:text-zinc-200 prose-table:border-collapse prose-th:border prose-th:border-zinc-700 prose-th:px-3 prose-th:py-1.5 prose-th:bg-zinc-800 prose-td:border prose-td:border-zinc-700 prose-td:px-3 prose-td:py-1.5">
+            <ReactMarkdown remarkPlugins={[remarkGfm]} rehypePlugins={[rehypeHighlight]}>
+              {message.content}
+            </ReactMarkdown>
+          </div>
+        )}
       </div>
     </div>
   );
@@ -53,6 +65,13 @@ export default function MessageThread({
   messages,
   loading,
 }: MessageThreadProps) {
+  const scrollRef = useRef<HTMLDivElement>(null);
+
+  // Scroll to top when conversation changes
+  useEffect(() => {
+    scrollRef.current?.scrollTo(0, 0);
+  }, [conversation?.id]);
+
   if (!conversation) {
     return (
       <div className="flex-1 flex items-center justify-center text-zinc-600">
@@ -77,7 +96,7 @@ export default function MessageThread({
       </div>
 
       {/* Messages */}
-      <div className="flex-1 overflow-y-auto p-6">
+      <div ref={scrollRef} className="flex-1 overflow-y-auto p-6">
         {loading ? (
           <LoadingSkeleton />
         ) : messages.length === 0 ? (
