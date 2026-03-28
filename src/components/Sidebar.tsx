@@ -5,6 +5,10 @@ interface SidebarProps {
   onSearchChange: (query: string) => void;
   sourceFilter: "all" | "claude-code" | "cursor";
   onSourceFilterChange: (source: "all" | "claude-code" | "cursor") => void;
+  dateFrom: string;
+  dateTo: string;
+  onDateFromChange: (date: string) => void;
+  onDateToChange: (date: string) => void;
   totalCount: number;
   filteredCount: number;
 }
@@ -20,6 +24,10 @@ export default function Sidebar({
   onSearchChange,
   sourceFilter,
   onSourceFilterChange,
+  dateFrom,
+  dateTo,
+  onDateFromChange,
+  onDateToChange,
   totalCount,
   filteredCount,
 }: SidebarProps) {
@@ -84,6 +92,49 @@ export default function Sidebar({
             </button>
           ))}
         </div>
+      </div>
+
+      {/* Date range */}
+      <div>
+        <p className="text-xs text-zinc-500 uppercase tracking-wider mb-2">Date Range</p>
+        {!(dateFrom || dateTo) ? (
+          <button
+            onClick={() => {
+              const today = new Date().toISOString().split("T")[0];
+              onDateToChange(today);
+            }}
+            className="text-sm text-zinc-400 hover:text-zinc-200 px-3 py-1.5 rounded-md hover:bg-zinc-900 text-left w-full"
+          >
+            + Add date filter
+          </button>
+        ) : (
+          <div className="flex flex-col gap-2">
+            <div>
+              <label className="text-[11px] text-zinc-500 block mb-1">From</label>
+              <input
+                type="date"
+                value={dateFrom}
+                onChange={(e) => onDateFromChange(e.target.value)}
+                className="w-full px-2 py-1.5 bg-zinc-900 border border-zinc-700 rounded-md text-xs text-zinc-300 focus:outline-none focus:border-zinc-500 [color-scheme:dark]"
+              />
+            </div>
+            <div>
+              <label className="text-[11px] text-zinc-500 block mb-1">To</label>
+              <input
+                type="date"
+                value={dateTo}
+                onChange={(e) => onDateToChange(e.target.value)}
+                className="w-full px-2 py-1.5 bg-zinc-900 border border-zinc-700 rounded-md text-xs text-zinc-300 focus:outline-none focus:border-zinc-500 [color-scheme:dark]"
+              />
+            </div>
+            <button
+              onClick={() => { onDateFromChange(""); onDateToChange(""); }}
+              className="text-xs text-zinc-500 hover:text-zinc-300 text-left"
+            >
+              Clear dates
+            </button>
+          </div>
+        )}
       </div>
 
       {/* Stats */}
