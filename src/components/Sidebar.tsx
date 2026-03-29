@@ -11,6 +11,8 @@ interface SidebarProps {
   onDateToChange: (date: string) => void;
   totalCount: number;
   filteredCount: number;
+  onRefresh: () => void;
+  loading: boolean;
 }
 
 const sources = [
@@ -30,6 +32,8 @@ export default function Sidebar({
   onDateToChange,
   totalCount,
   filteredCount,
+  onRefresh,
+  loading,
 }: SidebarProps) {
   const searchRef = useRef<HTMLInputElement>(null);
 
@@ -37,7 +41,29 @@ export default function Sidebar({
 
   return (
     <aside className="w-64 border-r border-zinc-800 flex flex-col p-4 gap-4 shrink-0">
-      <h1 className="text-lg font-semibold text-zinc-100">Recall</h1>
+      <div className="flex items-center justify-between">
+        <h1 className="text-lg font-semibold text-zinc-100">Recall</h1>
+        <button
+          onClick={onRefresh}
+          disabled={loading}
+          title="Refresh conversations"
+          className="p-1.5 text-zinc-500 hover:text-zinc-200 hover:bg-zinc-800 rounded-md transition-colors disabled:opacity-50"
+        >
+          <svg
+            className={`h-4 w-4 ${loading ? "animate-spin" : ""}`}
+            fill="none"
+            stroke="currentColor"
+            viewBox="0 0 24 24"
+          >
+            <path
+              strokeLinecap="round"
+              strokeLinejoin="round"
+              strokeWidth={2}
+              d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"
+            />
+          </svg>
+        </button>
+      </div>
 
       {/* Search */}
       <div className="relative">

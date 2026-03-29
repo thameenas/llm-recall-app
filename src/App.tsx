@@ -1,4 +1,4 @@
-import { useEffect, useState, useMemo } from "react";
+import { useEffect, useState, useMemo, useCallback } from "react";
 import { invoke } from "@tauri-apps/api/core";
 import { Conversation, Message } from "./lib/types";
 import { search } from "./lib/search";
@@ -25,8 +25,9 @@ function App() {
   // Debounce search by 200ms so we don't search on every keystroke
   const debouncedQuery = useDebounce(searchQuery, 200);
 
-  // Load all conversations on startup
-  useEffect(() => {
+  // Shared function to load/reload conversations
+  const loadConversations = useCallback(() => {
+    setLoading(true);
     invoke<Conversation[]>("list_conversations")
       .then((data) => {
         setConversations(data);
@@ -37,6 +38,20 @@ function App() {
         setLoading(false);
       });
   }, []);
+
+  // Load on startup
+  useEffect(() => {
+    loadConversations();
+  }, [loadConversations]);
+
+  // Auto-refresh when the window regains focus
+  useEffect(() => {
+    function handleFocus() {
+      loadConversations();
+    }
+    window.addEventListener("focus", handleFocus);
+    return () => window.removeEventListener("focus", handleFocus);
+  }, [loadConversations]);
 
   // Load messages when a conversation is selected
   useEffect(() => {
@@ -99,6 +114,8 @@ function App() {
         onDateToChange={setDateTo}
         totalCount={conversations.length}
         filteredCount={filtered.length}
+        onRefresh={loadConversations}
+        loading={loading}
       />
 
       {/* Middle panel: conversation list */}
