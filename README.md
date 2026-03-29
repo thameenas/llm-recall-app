@@ -32,7 +32,7 @@ If you switch between Claude Code and Cursor, your conversations end up scattere
 
 ```bash
 # Clone the repo
-git clone [<repo-url>](https://github.com/thameenas/llm-recall-app)
+git clone https://github.com/thameenas/llm-recall-app
 cd recall
 
 # Install dependencies
