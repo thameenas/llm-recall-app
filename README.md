@@ -6,6 +6,9 @@ If you switch between Claude Code and Cursor, your conversations end up scattere
 
 ![Dark themed three-panel interface](https://img.shields.io/badge/platform-macOS-lightgrey)
 
+<img width="1465" height="863" alt="Screenshot 2026-03-29 at 1 33 25 PM" src="https://github.com/user-attachments/assets/c7b4d8b8-7a76-4a6b-bf72-708ec284e48e" />
+
+
 ## Features
 
 - **Unified conversation list** from both Claude Code and Cursor, sorted by date
@@ -29,7 +32,7 @@ If you switch between Claude Code and Cursor, your conversations end up scattere
 
 ```bash
 # Clone the repo
-git clone <repo-url>
+git clone [<repo-url>](https://github.com/thameenas/llm-recall-app)
 cd recall
 
 # Install dependencies
@@ -50,15 +53,6 @@ Recall reads your local chat history in **read-only mode**. It never modifies yo
 | Claude Code | `~/.claude/history.jsonl` and `~/.claude/projects/` |
 | Cursor | `~/Library/Application Support/Cursor/User/globalStorage/state.vscdb` |
 
-## macOS security note
-
-The app is ad-hoc signed but not notarized with Apple. On first launch, macOS may warn about an "unidentified developer." To open it: right-click the app, then click Open.
-
-If you see "Recall is damaged and can't be opened", run this in Terminal:
-
-```bash
-xattr -cr /Applications/Recall.app
-```
 
 ## Building a standalone app
 
