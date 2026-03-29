@@ -28,7 +28,10 @@ If you switch between Claude Code and Cursor, your conversations end up scattere
 
 1. Download the latest `.dmg` from the [Releases page](https://github.com/thameenas/llm-recall-app/releases)
 2. Open the DMG and drag Recall to your Applications folder
-3. Right-click the app → Open (to bypass the unidentified developer warning)
+3. Since this is a self-signed app and not apple signed, you will have to manually allow to open this app via security settings:
+   <img width="50%" height="50%" src="https://github.com/user-attachments/assets/9d55445f-22c4-44f4-847a-e348ca9ba8f2" />
+
+
 
 > Apple Silicon (M1/M2/M3/M4) Macs only.
 
