@@ -22,27 +22,38 @@ If you switch between Claude Code and Cursor, your conversations end up scattere
   - `Enter / Shift + Enter` — jump between search matches
   - `Escape` — clear search
 
-## Requirements
-
-- macOS
-- [Node.js](https://nodejs.org/) (v18 or later)
-- [Rust](https://rustup.rs/) (install with `curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh`)
-
 ## Getting started
+
+### Option 1: Download the app 
+
+1. Download the latest `.dmg` from the [Releases page](https://github.com/thameenas/llm-recall-app/releases)
+2. Open the DMG and drag Recall to your Applications folder
+3. Right-click the app → Open (to bypass the unidentified developer warning)
+
+> Apple Silicon (M1/M2/M3/M4) Macs only.
+
+### Option 2: Build from source
+
+Requires [Node.js](https://nodejs.org/) (v18+) and [Rust](https://rustup.rs/).
 
 ```bash
 # Clone the repo
 git clone https://github.com/thameenas/llm-recall-app
-cd recall
+cd llm-recall-app
 
 # Install dependencies
 npm install
 
-# Run the app
+# Run in development mode
 npm run tauri dev
+
+# Or build a standalone .app
+npm run tauri build
 ```
 
-The app will open in a native window. It reads your chat history directly from disk — no accounts, no cloud, no config needed.
+The built app will be in `src-tauri/target/release/bundle/macos/`.
+
+No accounts, no cloud, no config needed — the app reads your chat history directly from disk.
 
 ## Where does it read data from?
 
@@ -52,17 +63,6 @@ Recall reads your local chat history in **read-only mode**. It never modifies yo
 |---|---|
 | Claude Code | `~/.claude/history.jsonl` and `~/.claude/projects/` |
 | Cursor | `~/Library/Application Support/Cursor/User/globalStorage/state.vscdb` |
-
-
-## Building a standalone app
-
-To create a `.app` bundle you can double-click to launch:
-
-```bash
-npm run tauri build
-```
-
-The built app will be in `src-tauri/target/release/bundle/macos/`.
 
 ## Privacy
 
