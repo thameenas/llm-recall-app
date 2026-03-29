@@ -1,7 +1,5 @@
 import { useEffect, useRef, useState, useMemo } from "react";
-import ReactMarkdown from "react-markdown";
-import rehypeHighlight from "rehype-highlight";
-import remarkGfm from "remark-gfm";
+import { invoke } from "@tauri-apps/api/core";
 import { useDebounce } from "../hooks/useDebounce";
 import { Conversation, Message } from "../lib/types";
 
@@ -9,6 +7,18 @@ interface MessageThreadProps {
   conversation: Conversation | null;
   messages: Message[];
   loading: boolean;
+}
+
+// Cache for markdown-to-HTML conversions to avoid repeated Rust calls
+const htmlCache = new Map<string, string>();
+
+async function renderMarkdown(text: string): Promise<string> {
+  const cached = htmlCache.get(text);
+  if (cached) return cached;
+
+  const html = await invoke<string>("markdown_to_html", { text });
+  htmlCache.set(text, html);
+  return html;
 }
 
 /**
@@ -29,6 +39,23 @@ function highlightText(text: string, query: string): React.ReactNode[] {
     ) : (
       part
     )
+  );
+}
+
+function MarkdownContent({ content }: { content: string }) {
+  const [html, setHtml] = useState<string>("");
+
+  useEffect(() => {
+    renderMarkdown(content).then(setHtml);
+  }, [content]);
+
+  if (!html) return <div className="text-sm text-zinc-400">Rendering...</div>;
+
+  return (
+    <div
+      className="text-sm prose prose-invert prose-sm max-w-none prose-pre:bg-zinc-950 prose-pre:border prose-pre:border-zinc-700 prose-code:text-emerald-400 prose-headings:text-zinc-100 prose-p:text-zinc-200 prose-a:text-blue-400 prose-strong:text-zinc-100 prose-li:text-zinc-200 prose-table:border-collapse prose-th:border prose-th:border-zinc-700 prose-th:px-3 prose-th:py-1.5 prose-th:bg-zinc-800 prose-td:border prose-td:border-zinc-700 prose-td:px-3 prose-td:py-1.5"
+      dangerouslySetInnerHTML={{ __html: html }}
+    />
   );
 }
 
@@ -53,11 +80,7 @@ function MessageBubble({ message, searchQuery }: { message: Message; searchQuery
             {searchQuery ? highlightText(message.content, searchQuery) : message.content}
           </div>
         ) : (
-          <div className="text-sm prose prose-invert prose-sm max-w-none prose-pre:bg-zinc-950 prose-pre:border prose-pre:border-zinc-700 prose-code:text-emerald-400 prose-headings:text-zinc-100 prose-p:text-zinc-200 prose-a:text-blue-400 prose-strong:text-zinc-100 prose-li:text-zinc-200 prose-table:border-collapse prose-th:border prose-th:border-zinc-700 prose-th:px-3 prose-th:py-1.5 prose-th:bg-zinc-800 prose-td:border prose-td:border-zinc-700 prose-td:px-3 prose-td:py-1.5">
-            <ReactMarkdown remarkPlugins={[remarkGfm]} rehypePlugins={[rehypeHighlight]}>
-              {message.content}
-            </ReactMarkdown>
-          </div>
+          <MarkdownContent content={message.content} />
         )}
       </div>
     </div>
