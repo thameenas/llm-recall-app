@@ -6,7 +6,7 @@ If you switch between Claude Code and Cursor, your conversations end up scattere
 
 ![Dark themed three-panel interface](https://img.shields.io/badge/platform-macOS-lightgrey)
 
-<img width="1465" height="863" alt="Screenshot 2026-03-29 at 1 33 25 PM" src="https://github.com/user-attachments/assets/c7b4d8b8-7a76-4a6b-bf72-708ec284e48e" />
+<img width="75%" height="75%" alt="Screenshot 2026-03-29 at 1 33 25 PM" src="https://github.com/user-attachments/assets/c7b4d8b8-7a76-4a6b-bf72-708ec284e48e" />
 
 
 ## Features
