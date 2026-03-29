@@ -20,6 +20,7 @@ function App() {
   const [sourceFilter, setSourceFilter] = useState<"all" | "claude-code" | "cursor">("all");
   const [dateFrom, setDateFrom] = useState("");
   const [dateTo, setDateTo] = useState("");
+  const [listCollapsed, setListCollapsed] = useState(false);
 
   // Debounce search by 200ms so we don't search on every keystroke
   const debouncedQuery = useDebounce(searchQuery, 200);
@@ -105,6 +106,8 @@ function App() {
         conversations={filtered}
         loading={loading}
         selectedId={selectedId}
+        collapsed={listCollapsed}
+        onToggleCollapse={() => setListCollapsed((prev) => !prev)}
         onSelect={(id, source) => {
           setSelectedId(id);
           setSelectedSource(source);
