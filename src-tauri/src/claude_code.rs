@@ -45,12 +45,6 @@ pub fn list_conversations() -> Vec<Conversation> {
             .as_str()
             .unwrap_or("Unknown");
 
-        // Get the project's last folder name for a cleaner display
-        let project_name = project
-            .rsplit('/')
-            .next()
-            .unwrap_or(project);
-
         let timestamps: Vec<u64> = entries
             .iter()
             .filter_map(|e| e["timestamp"].as_u64())

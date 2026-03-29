@@ -330,12 +330,6 @@ pub fn list_conversations() -> Vec<Conversation> {
             .map(|m| m.project.clone())
             .unwrap_or_else(|| "Unknown project".to_string());
 
-        let project_name = project
-            .rsplit('/')
-            .next()
-            .unwrap_or(&project)
-            .to_string();
-
         let title = if !name.is_empty() {
             name
         } else {
