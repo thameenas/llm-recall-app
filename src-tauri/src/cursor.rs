@@ -22,8 +22,12 @@ fn workspace_storage_dir() -> PathBuf {
 /// Metadata about a composer.
 struct ComposerMeta {
     project: String,
+    name: String,
     created_at: u64,
     updated_at: u64,
+    /// Ordered list of (bubbleId, type) from fullConversationHeadersOnly.
+    /// type 1 = user, type 2 = assistant.
+    ordered_bubble_ids: Vec<(String, u64)>,
 }
 
 /// Reads composer metadata and subagent IDs from both data sources:
@@ -75,13 +79,19 @@ fn build_composer_metadata(
                             let updated_at = composer["lastUpdatedAt"]
                                 .as_u64()
                                 .unwrap_or(created_at);
+                            let name = composer["name"]
+                                .as_str()
+                                .unwrap_or("")
+                                .to_string();
 
                             map.insert(
                                 id.to_string(),
                                 ComposerMeta {
                                     project: folder.clone(),
+                                    name,
                                     created_at,
                                     updated_at,
+                                    ordered_bubble_ids: vec![],
                                 },
                             );
                         }
@@ -132,23 +142,48 @@ fn build_composer_metadata(
                     }
                 }
 
-                // Only insert if not already present from workspace scan
-                if !map.contains_key(&composer_id) {
-                    let created_at = parsed["createdAt"].as_u64().unwrap_or(0);
-                    let updated_at = parsed["lastUpdatedAt"]
-                        .as_u64()
-                        .unwrap_or(created_at);
+                // Extract ordered bubble IDs from fullConversationHeadersOnly
+                let ordered_bubble_ids = parsed["fullConversationHeadersOnly"]
+                    .as_array()
+                    .map(|arr| {
+                        arr.iter()
+                            .filter_map(|h| {
+                                let bid = h["bubbleId"].as_str()?.to_string();
+                                let btype = h["type"].as_u64().unwrap_or(0);
+                                Some((bid, btype))
+                            })
+                            .collect::<Vec<_>>()
+                    })
+                    .unwrap_or_default();
 
-                    // Try to extract project from attached file URIs
-                    let project = extract_project_from_uris(&parsed)
-                        .unwrap_or_else(|| "Unknown project".to_string());
+                let created_at = parsed["createdAt"].as_u64().unwrap_or(0);
+                let updated_at = parsed["lastUpdatedAt"]
+                    .as_u64()
+                    .unwrap_or(created_at);
+                let name = parsed["name"]
+                    .as_str()
+                    .unwrap_or("")
+                    .to_string();
+                let project = extract_project_from_uris(&parsed)
+                    .unwrap_or_else(|| "Unknown project".to_string());
 
+                // Update existing entry with richer data, or insert new
+                if let Some(existing) = map.get_mut(&composer_id) {
+                    if existing.name.is_empty() && !name.is_empty() {
+                        existing.name = name;
+                    }
+                    if existing.ordered_bubble_ids.is_empty() && !ordered_bubble_ids.is_empty() {
+                        existing.ordered_bubble_ids = ordered_bubble_ids;
+                    }
+                } else {
                     map.insert(
                         composer_id,
                         ComposerMeta {
                             project,
+                            name,
                             created_at,
                             updated_at,
+                            ordered_bubble_ids,
                         },
                     );
                 }
@@ -278,9 +313,18 @@ pub fn list_conversations() -> Vec<Conversation> {
             continue;
         }
 
-        let preview = get_first_user_message(&db, composer_id, bubble_ids);
-
         let meta = metadata_map.get(composer_id);
+
+        // Use ordered headers to find the real first user message,
+        // fall back to unordered bubble scan
+        let preview = meta
+            .and_then(|m| get_first_user_message_ordered(&db, composer_id, &m.ordered_bubble_ids))
+            .unwrap_or_else(|| get_first_user_message(&db, composer_id, bubble_ids));
+
+        // Use Cursor's auto-generated name as title if available
+        let name = meta
+            .map(|m| m.name.clone())
+            .unwrap_or_default();
 
         let project = meta
             .map(|m| m.project.clone())
@@ -292,13 +336,19 @@ pub fn list_conversations() -> Vec<Conversation> {
             .unwrap_or(&project)
             .to_string();
 
+        let title = if !name.is_empty() {
+            format!("{} — {}", project_name, name)
+        } else {
+            format!("{} — {}", project_name, truncate(&preview, 60))
+        };
+
         let created_at = meta.map(|m| m.created_at).unwrap_or(0);
         let updated_at = meta.map(|m| m.updated_at).unwrap_or(created_at);
 
         conversations.push(Conversation {
             id: composer_id.clone(),
             source: "cursor".to_string(),
-            title: format!("{} — {}", project_name, truncate(&preview, 60)),
+            title,
             preview: truncate(&preview, 120).to_string(),
             project,
             created_at,
@@ -311,7 +361,37 @@ pub fn list_conversations() -> Vec<Conversation> {
     conversations
 }
 
-/// Gets the first user message text for a conversation.
+/// Gets the first user message using the ordered headers from composerData.
+fn get_first_user_message_ordered(
+    db: &Connection,
+    composer_id: &str,
+    ordered: &[(String, u64)],
+) -> Option<String> {
+    for (bubble_id, btype) in ordered {
+        if *btype != 1 {
+            continue; // skip non-user messages
+        }
+        let key = format!("bubbleId:{}:{}", composer_id, bubble_id);
+        let value: Option<String> = db
+            .query_row("SELECT value FROM cursorDiskKV WHERE key = ?1", [&key], |row| {
+                row.get(0)
+            })
+            .ok();
+
+        if let Some(json_str) = value {
+            if let Ok(parsed) = serde_json::from_str::<Value>(&json_str) {
+                if let Some(text) = parsed["text"].as_str() {
+                    if !text.is_empty() {
+                        return Some(text.to_string());
+                    }
+                }
+            }
+        }
+    }
+    None
+}
+
+/// Gets the first user message text by scanning bubbles (unordered fallback).
 fn get_first_user_message(db: &Connection, composer_id: &str, bubble_ids: &[String]) -> String {
     for bubble_id in bubble_ids {
         let key = format!("bubbleId:{}:{}", composer_id, bubble_id);
