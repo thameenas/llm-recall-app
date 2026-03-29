@@ -19,10 +19,17 @@ fn workspace_storage_dir() -> PathBuf {
         .join("Library/Application Support/Cursor/User/workspaceStorage")
 }
 
-/// Builds a map of composerId -> project folder path
+/// Metadata about a composer extracted from workspace state.vscdb
+struct ComposerMeta {
+    project: String,
+    created_at: u64,
+    updated_at: u64,
+}
+
+/// Builds a map of composerId -> metadata (project, timestamps)
 /// by scanning all workspace state.vscdb files.
-fn build_composer_to_project_map() -> HashMap<String, String> {
-    let mut map: HashMap<String, String> = HashMap::new();
+fn build_composer_metadata_map() -> HashMap<String, ComposerMeta> {
+    let mut map: HashMap<String, ComposerMeta> = HashMap::new();
     let ws_dir = workspace_storage_dir();
 
     let entries = match fs::read_dir(&ws_dir) {
@@ -41,7 +48,7 @@ fn build_composer_to_project_map() -> HashMap<String, String> {
             None => continue,
         };
 
-        // Open the workspace's state.vscdb to get composer IDs
+        // Open the workspace's state.vscdb to get composer data
         let db = match Connection::open_with_flags(
             &state_db,
             OpenFlags::SQLITE_OPEN_READ_ONLY,
@@ -59,12 +66,21 @@ fn build_composer_to_project_map() -> HashMap<String, String> {
             Err(_) => continue,
         };
 
-        // Parse composer data to get composer IDs for this workspace
+        // Parse composer data to get IDs and timestamps
         if let Ok(parsed) = serde_json::from_str::<Value>(&composer_data) {
             if let Some(composers) = parsed["allComposers"].as_array() {
                 for composer in composers {
                     if let Some(id) = composer["composerId"].as_str() {
-                        map.insert(id.to_string(), folder.clone());
+                        let created_at = composer["createdAt"].as_u64().unwrap_or(0);
+                        let updated_at = composer["lastUpdatedAt"]
+                            .as_u64()
+                            .unwrap_or(created_at);
+
+                        map.insert(id.to_string(), ComposerMeta {
+                            project: folder.clone(),
+                            created_at,
+                            updated_at,
+                        });
                     }
                 }
             }
@@ -115,8 +131,8 @@ pub fn list_conversations() -> Vec<Conversation> {
         Err(_) => return vec![],
     };
 
-    // Build composer -> project mapping from workspace databases
-    let project_map = build_composer_to_project_map();
+    // Build composer -> metadata mapping from workspace databases
+    let metadata_map = build_composer_metadata_map();
 
     // Get all bubble keys to group by composerId
     let mut stmt = match db.prepare(
@@ -152,9 +168,10 @@ pub fn list_conversations() -> Vec<Conversation> {
         // Get the first user message as preview
         let preview = get_first_user_message(&db, composer_id, bubble_ids);
 
-        let project = project_map
-            .get(composer_id)
-            .cloned()
+        let meta = metadata_map.get(composer_id);
+
+        let project = meta
+            .map(|m| m.project.clone())
             .unwrap_or_else(|| "Unknown project".to_string());
 
         let project_name = project
@@ -163,8 +180,8 @@ pub fn list_conversations() -> Vec<Conversation> {
             .unwrap_or(&project)
             .to_string();
 
-        // Get created_at from the first bubble's data or use 0
-        let created_at = get_composer_timestamp(&db, composer_id, bubble_ids);
+        let created_at = meta.map(|m| m.created_at).unwrap_or(0);
+        let updated_at = meta.map(|m| m.updated_at).unwrap_or(created_at);
 
         conversations.push(Conversation {
             id: composer_id.clone(),
@@ -173,7 +190,7 @@ pub fn list_conversations() -> Vec<Conversation> {
             preview: truncate(&preview, 120).to_string(),
             project,
             created_at,
-            updated_at: created_at,
+            updated_at,
             message_count: bubble_ids.len(),
         });
     }
@@ -214,29 +231,6 @@ fn get_first_user_message(db: &Connection, composer_id: &str, bubble_ids: &[Stri
         }
     }
     "(no preview)".to_string()
-}
-
-/// Gets a rough timestamp for the conversation from bubble data.
-fn get_composer_timestamp(db: &Connection, composer_id: &str, bubble_ids: &[String]) -> u64 {
-    if let Some(first_id) = bubble_ids.first() {
-        let key = format!("bubbleId:{}:{}", composer_id, first_id);
-        let value: Option<String> = db
-            .query_row(
-                "SELECT value FROM cursorDiskKV WHERE key = ?1",
-                [&key],
-                |row| row.get(0),
-            )
-            .ok();
-
-        if let Some(json_str) = value {
-            if let Ok(parsed) = serde_json::from_str::<Value>(&json_str) {
-                if let Some(ts) = parsed["timestamp"].as_u64() {
-                    return ts;
-                }
-            }
-        }
-    }
-    0
 }
 
 /// Gets all messages for a specific conversation.
