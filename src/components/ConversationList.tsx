@@ -146,7 +146,7 @@ export default function ConversationList({
                     {formatRelativeDate(c.created_at)}
                   </span>
                 </div>
-                <p className="text-sm text-zinc-200 truncate">{c.preview}</p>
+                <p className="text-sm text-zinc-200 truncate">{c.title}</p>
                 <p className="text-xs text-zinc-500 mt-1 truncate">
                   {c.project.split("/").pop() || c.project} · {c.message_count} messages
                 </p>

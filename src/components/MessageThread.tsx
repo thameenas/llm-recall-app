@@ -186,7 +186,7 @@ export default function MessageThread({
         <div className="flex items-center justify-between gap-4">
           <div className="min-w-0">
             <h2 className="text-sm font-medium text-zinc-200 truncate">
-              {conversation.preview}
+              {conversation.title}
             </h2>
             <p className="text-xs text-zinc-500 mt-0.5">
               {conversation.project.split("/").pop()} · {conversation.message_count} messages

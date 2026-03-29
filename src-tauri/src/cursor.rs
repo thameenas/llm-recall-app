@@ -337,9 +337,9 @@ pub fn list_conversations() -> Vec<Conversation> {
             .to_string();
 
         let title = if !name.is_empty() {
-            format!("{} — {}", project_name, name)
+            name
         } else {
-            format!("{} — {}", project_name, truncate(&preview, 60))
+            truncate(&preview, 120).to_string()
         };
 
         let created_at = meta.map(|m| m.created_at).unwrap_or(0);

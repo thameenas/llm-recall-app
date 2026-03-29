@@ -62,7 +62,7 @@ pub fn list_conversations() -> Vec<Conversation> {
         conversations.push(Conversation {
             id: session_id.clone(),
             source: "claude-code".to_string(),
-            title: format!("{} — {}", project_name, truncate(first_display, 60)),
+            title: truncate(first_display, 120).to_string(),
             preview: truncate(first_display, 120).to_string(),
             project: project.to_string(),
             created_at: min_ts,
