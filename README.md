@@ -50,6 +50,16 @@ Recall reads your local chat history in **read-only mode**. It never modifies yo
 | Claude Code | `~/.claude/history.jsonl` and `~/.claude/projects/` |
 | Cursor | `~/Library/Application Support/Cursor/User/globalStorage/state.vscdb` |
 
+## macOS security note
+
+The app is ad-hoc signed but not notarized with Apple. On first launch, macOS may warn about an "unidentified developer." To open it: right-click the app, then click Open.
+
+If you see "Recall is damaged and can't be opened", run this in Terminal:
+
+```bash
+xattr -cr /Applications/Recall.app
+```
+
 ## Building a standalone app
 
 To create a `.app` bundle you can double-click to launch:
